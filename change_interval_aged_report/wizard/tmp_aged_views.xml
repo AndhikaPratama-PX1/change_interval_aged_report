@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    
+
+    <record id="tmp_aged_report_wizard_form" model="ir.ui.view">
+        <field name="name">tmp_aged_report_wizard_form</field>
+        <field name="model">tmp.aged.report.wizard</field>
+        <field name="type">form</field>
+        <field name="arch" type="xml">
+            <form string="Aged Report">
+                <group>
+                    <label for="interval_1_1" string="Interval 1"/>
+                    <div class="change_aged_interval">
+                        <field name="interval_1_1" class="oe_inline"/>
+                        <span> - </span>
+                        <field name="interval_1_2" class="oe_inline"/>
+                    </div>
+
+                    <label for="interval_2_1" string="Interval 2"/>
+                    <div class="change_aged_interval">
+                        <field name="interval_2_1" class="oe_inline"/>
+                        <span> - </span>
+                        <field name="interval_2_2" class="oe_inline"/>
+                    </div>
+
+                    <label for="interval_3_1" string="Interval 3"/>
+                    <div class="change_aged_interval">
+                        <field name="interval_3_1" class="oe_inline"/>
+                        <span> - </span>
+                        <field name="interval_3_2" class="oe_inline"/>
+                    </div>
+
+                    <label for="interval_4_1" string="Interval 4"/>
+                    <div class="change_aged_interval">
+                        <field name="interval_4_1" class="oe_inline"/>
+                        <span> - </span>
+                        <field name="interval_4_2" class="oe_inline"/>
+                    </div>
+                </group>
+                <footer>
+                    <button name="process" string="Open" class="oe_highlight" type="object"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="tmp_aged_receivable_report_wizard_action" model="ir.actions.act_window">
+        <field name="name">Aged Receivable</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">tmp.aged.report.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_name':'Receivable'}</field>
+    </record>
+
+    <record id="tmp_aged_payable_report_wizard_action" model="ir.actions.act_window">
+        <field name="name">Aged Payable</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">tmp.aged.report.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_name':'Payable'}</field>
+    </record>
+
+
+    <menuitem id="account_reports.menu_action_account_report_aged_receivable" name="Aged Receivable" action="tmp_aged_receivable_report_wizard_action" parent="account_reports.account_reports_partners_reports_menu"/>
+    <menuitem id="account_reports.menu_action_account_report_aged_payable" name="Aged Payable" action="tmp_aged_payable_report_wizard_action" parent="account_reports.account_reports_partners_reports_menu"/>
+
+
+
+
+
+</odoo>

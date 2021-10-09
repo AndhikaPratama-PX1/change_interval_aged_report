@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+	<template  id="assets_change_interval_aged_report_layout" inherit_id="web.assets_backend">
+            <xpath expr="." position="inside">
+                <!-- css section -->
+                <link rel="stylesheet" type="text/css" href="/change_interval_aged_report/static/src/css/style.css"/>
+            </xpath>
+        </template>
+  
+
+</odoo>
