@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 {
-    'name': 'Change Date Interval Aged Receivable & Payable Report',
+    'name': 'Customize Change Date Interval Aged Receivable & Payable Report',
     'category': 'Accounting', 
     'author': 'Apra IT Solutions', 
     'version': '1.0',
