@@ -1,21 +1,25 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Change Date Interval Aged Receivable & Payable Report',
-    'category': 'Uncategorized', 
+    'category': 'Accounting', 
     'author': 'Apra IT Solutions', 
     'version': '1.0',
-    'description': """
+    'license': 'LGPL-3',
+    'summary': """
         Use this module if want to change date interval on aged receivable & payable report
     """, 
     'depends': ['base','account','account_reports'],
     'data': [ 
        'security/ir.model.access.csv',
-       'security/apollo_security.xml',
        'views/assets.xml',
-       'views/product_views.xml',
+       'wizard/tmp_aged_views.xml',
 
     ],   
-    'qweb': [ 
-                # "static/src/xml/account_reconciliation.xml",
+    'images': [
+        'static/description/change_interval_aged_report.png',
     ],
+
+    'maintainer': 'Apra IT Solutions.',
+    'price': 72.00,
+    'currency': 'USD',
 }
