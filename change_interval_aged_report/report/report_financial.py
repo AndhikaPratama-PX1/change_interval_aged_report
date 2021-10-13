@@ -6,7 +6,7 @@ from odoo.tools.misc import format_date
 
 from dateutil.relativedelta import relativedelta
 from itertools import chain
-
+import json
 
 class ReportAccountAgedPartner(models.AbstractModel):
     _inherit = "account.aged.partner"
@@ -34,18 +34,19 @@ class ReportAccountAgedPartner(models.AbstractModel):
 
         date_str = options['date']['date_to']
         date = fields.Date.from_string(date_str)
-        if self._context.get('interval'):
-            interval_1_1 = self._context.get('interval')['1'][0]
-            interval_1_2 = self._context.get('interval')['1'][1]
+        interval = self._context.get('interval') or options.get('interval')
+        if interval:
+            interval_1_1 = int(interval['1'][0])
+            interval_1_2 = int(interval['1'][1])
 
-            interval_2_1 = self._context.get('interval')['2'][0]
-            interval_2_2 = self._context.get('interval')['2'][1]
+            interval_2_1 = int(interval['2'][0])
+            interval_2_2 = int(interval['2'][1])
 
-            interval_3_1 = self._context.get('interval')['3'][0]
-            interval_3_2 = self._context.get('interval')['3'][1]
+            interval_3_1 = int(interval['3'][0])
+            interval_3_2 = int(interval['3'][1])
 
-            interval_4_1 = self._context.get('interval')['4'][0]
-            interval_4_2 = self._context.get('interval')['4'][1]
+            interval_4_1 = int(interval['4'][0])
+            interval_4_2 = int(interval['4'][1])
 
             period_values = [
                 (False,                  date_str),
@@ -74,6 +75,42 @@ class ReportAccountAgedPartner(models.AbstractModel):
         return self.env.cr.mogrify(period_table, params).decode(self.env.cr.connection.encoding)
 
 
+    def print_xlsx(self, options):
+        options['interval'] = self.env.context.get('interval')
+        return {
+                'type': 'ir_actions_account_report_download',
+                'data': {'model': self.env.context.get('model'),
+                         'options': json.dumps(options),
+                         'output_format': 'xlsx',
+                         'financial_id': self.env.context.get('id'),
+                         }
+                }
+
+
+    @api.model
+    def _get_column_details(self, options):
+        return [
+            self._header_column(),
+            self._field_column('report_date'),
+            self._field_column('journal_code', name="Journal"),
+            self._field_column('account_name', name="Account"),
+            self._field_column('expected_pay_date'),
+            self._field_column('period0', name=_("As of: %s") % format_date(self.env, options['date']['date_to'])),
+            self.with_context(intervalo=options.get('interval'))._field_column('period1', sortable=True),
+            self.with_context(intervalo=options.get('interval'))._field_column('period2', sortable=True),
+            self.with_context(intervalo=options.get('interval'))._field_column('period3', sortable=True),
+            self.with_context(intervalo=options.get('interval'))._field_column('period4', sortable=True),
+            self._field_column('period5', sortable=True),
+            self._custom_column(  # Avoid doing twice the sub-select in the view
+                name=_('Total'),
+                classes=['number'],
+                formatter=self.format_value,
+                getter=(lambda v: v['period0'] + v['period1'] + v['period2'] + v['period3'] + v['period4'] + v['period5']),
+                sortable=True,
+            ),
+        ]
+
+
 
     def _field_column(self, field_name, sortable=False, name=None):
         """Build a column based on a field.
@@ -95,15 +132,17 @@ class ReportAccountAgedPartner(models.AbstractModel):
         elif self._fields[field_name].type in ['date']:
             classes += ['date']
             def formatter(v): return format_date(self.env, v)
-        if self._context.get('interval'):
+
+        interval = self._context.get('interval') or self._context.get('intervalo')
+        if interval:
             if field_name == 'period1':
-                name = str(self._context.get('interval')['1'][0]) + ' - ' + str(self._context.get('interval')['1'][1])
+                name = str(interval['1'][0]) + ' - ' + str(interval['1'][1])
             if field_name == 'period2':
-                name = str(self._context.get('interval')['2'][0]) + ' - ' + str(self._context.get('interval')['2'][1])
+                name = str(interval['2'][0]) + ' - ' + str(interval['2'][1])
             if field_name == 'period3':
-                name = str(self._context.get('interval')['3'][0]) + ' - ' + str(self._context.get('interval')['3'][1])
+                name = str(interval['3'][0]) + ' - ' + str(interval['3'][1])
             if field_name == 'period4':
-                name = str(self._context.get('interval')['4'][0]) + ' - ' + str(self._context.get('interval')['4'][1])
+                name = str(interval['4'][0]) + ' - ' + str(interval['4'][1])
         return self._custom_column(name=name or self._fields[field_name].string,
                                    getter=getter,
                                    formatter=formatter,
