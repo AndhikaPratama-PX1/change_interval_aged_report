@@ -3,7 +3,7 @@
     'name': 'Customize Change Date Interval Aged Receivable & Payable Report',
     'category': 'Accounting', 
     'author': 'Apra IT Solutions', 
-    'version': '1.0',
+    'version': '1.1',
     'license': 'LGPL-3',
     'summary': """
         Use this module if want to change date interval on aged receivable & payable report (Aged Interval).
