@@ -19,7 +19,7 @@
         'static/description/change_interval_aged_report.png',
     ],
 
-    'maintainer': 'Apra IT Solutions',
+#     'maintainer': 'Apra IT Solutions',
     'price': 40.00,
     'currency': 'USD',
 }
