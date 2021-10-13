@@ -6,7 +6,7 @@
     'version': '1.0',
     'license': 'LGPL-3',
     'summary': """
-        Use this module if want to change date interval on aged receivable & payable report
+        Use this module if want to change date interval on aged receivable & payable report.
     """, 
     'depends': ['account','account_reports'],
     'data': [ 
