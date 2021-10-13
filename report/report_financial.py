@@ -58,7 +58,7 @@ class ReportAccountAgedPartner(models.AbstractModel):
         else:
             period_values = [
                 (False,                  date_str),
-                (minus_days(date, ),    minus_days(date, 30)),
+                (minus_days(date, 1),    minus_days(date, 30)),
                 (minus_days(date, 31),   minus_days(date, 60)),
                 (minus_days(date, 61),   minus_days(date, 90)),
                 (minus_days(date, 91),   minus_days(date, 120)),
