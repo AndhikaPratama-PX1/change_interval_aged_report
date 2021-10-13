@@ -8,7 +8,7 @@
     'summary': """
         Use this module if want to change date interval on aged receivable & payable report.
     """, 
-#     'depends': ['account','account_reports'],
+    'depends': ['account','account_reports'],
     'data': [ 
        'security/ir.model.access.csv',
        'views/assets.xml',
