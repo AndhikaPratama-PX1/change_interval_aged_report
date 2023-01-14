@@ -6,145 +6,355 @@ from odoo.tools.misc import format_date
 
 from dateutil.relativedelta import relativedelta
 from itertools import chain
+import time
+from odoo import api, fields, models, _
+from odoo.exceptions import UserError
+from odoo.tools import float_is_zero
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
 import json
 
 class ReportAccountAgedPartner(models.AbstractModel):
     _inherit = "account.aged.partner"
 
+    def _get_columns_name(self, options):
+        ctx = self.env.context
+        columns = super(ReportAccountAgedPartner, self)._get_columns_name(options)
+        if options.get('interval_custom'):
+            for column in columns:
+                if column.get('name') == '1 - 30':
+                    column['name'] = str(options.get('interval')['1'][0]) +' - ' +str(options.get('interval')['1'][1])
+                elif column.get('name') == '31 - 60':
+                    column['name'] = str(options.get('interval')['2'][0]) +' - ' +str(options.get('interval')['2'][1])
+                elif column.get('name') == '61 - 90':
+                    column['name'] = str(options.get('interval')['3'][0]) +' - ' +str(options.get('interval')['3'][1])
+                elif column.get('name') == '91 - 120':
+                    column['name'] = str(options.get('interval')['4'][0]) +' - ' +str(options.get('interval')['4'][1])
+        return columns
+
+
     @api.model
-    def _get_query_period_table(self, options):
-        ''' Compute the periods to handle in the report.
-        E.g. Suppose date = '2019-01-09', the computed periods will be:
-
-        Name                | Start         | Stop
-        --------------------------------------------
-        As of 2019-01-09    | 2019-01-09    |
-        1 - 30              | 2018-12-10    | 2019-01-08
-        31 - 60             | 2018-11-10    | 2018-12-09
-        61 - 90             | 2018-10-11    | 2018-11-09
-        91 - 120            | 2018-09-11    | 2018-10-10
-        Older               |               | 2018-09-10
-
-        Then, return the values as an sql floating table to use it directly in queries.
-
-        :return: A floating sql query representing the report's periods.
-        '''
-        def minus_days(date_obj, days):
-            return fields.Date.to_string(date_obj - relativedelta(days=days))
-
-        date_str = options['date']['date_to']
-        date = fields.Date.from_string(date_str)
-        interval = self._context.get('interval') or options.get('interval')
-        if interval:
-            interval_1_1 = int(interval['1'][0])
-            interval_1_2 = int(interval['1'][1])
-
-            interval_2_1 = int(interval['2'][0])
-            interval_2_2 = int(interval['2'][1])
-
-            interval_3_1 = int(interval['3'][0])
-            interval_3_2 = int(interval['3'][1])
-
-            interval_4_1 = int(interval['4'][0])
-            interval_4_2 = int(interval['4'][1])
-
-            period_values = [
-                (False,                  date_str),
-                (minus_days(date,  interval_1_1),    minus_days(date, interval_1_2)),
-                (minus_days(date, interval_2_1),   minus_days(date, interval_2_2)),
-                (minus_days(date, interval_3_1),   minus_days(date, interval_3_2)),
-                (minus_days(date, interval_4_1),   minus_days(date, interval_4_2)),
-                (minus_days(date, interval_4_2+1),  False),
-            ]
-        else:
-            period_values = [
-                (False,                  date_str),
-                (minus_days(date, 1),    minus_days(date, 30)),
-                (minus_days(date, 31),   minus_days(date, 60)),
-                (minus_days(date, 61),   minus_days(date, 90)),
-                (minus_days(date, 91),   minus_days(date, 120)),
-                (minus_days(date, 121),  False),
-            ]
-
-        period_table = ('(VALUES %s) AS period_table(date_start, date_stop, period_index)' %
-                        ','.join("(%s, %s, %s)" for i, period in enumerate(period_values)))
-        params = list(chain.from_iterable(
-            (period[0] or None, period[1] or None, i)
-            for i, period in enumerate(period_values)
-        ))
-        return self.env.cr.mogrify(period_table, params).decode(self.env.cr.connection.encoding)
+    def _get_options(self, previous_options=None):
+        res = super(ReportAccountAgedPartner, self)._get_options(previous_options)
+        ctx = self.env.context
+        if ctx.get('interval_custom'):
+            res['interval_custom'] = ctx.get('interval_custom')
+            res['interval'] = ctx.get('interval')
+        return res
 
 
-    def print_xlsx(self, options):
-        options['interval'] = self.env.context.get('interval')
-        return {
-                'type': 'ir_actions_account_report_download',
-                'data': {'model': self.env.context.get('model'),
-                         'options': json.dumps(options),
-                         'output_format': 'xlsx',
-                         'financial_id': self.env.context.get('id'),
-                         }
+    @api.model
+    def _get_lines(self, options, line_id=None):
+        if options.get('interval_custom'):
+
+            sign = -1.0 if self.env.context.get('aged_balance') else 1.0
+            lines = []
+            account_types = [self.env.context.get('account_type')]
+            context = {'include_nullified_amount': True}
+            context['interval_custom'] = options.get('interval_custom')
+            context['interval'] = options.get('interval')
+                
+            if line_id and 'partner_' in line_id:
+                # we only want to fetch data about this partner because we are expanding a line
+                context.update(partner_ids=self.env['res.partner'].browse(int(line_id.split('_')[1])))
+            results, total, amls = self.env['report.account.report_agedpartnerbalance'].with_context(**context)._get_partner_move_lines(account_types, self._context['date_to'], 'posted', 30)
+
+            for values in results:
+                vals = {
+                    'id': 'partner_%s' % (values['partner_id'],),
+                    'name': values['name'],
+                    'level': 2,
+                    'columns': [{'name': ''}] * 4 + [{'name': self.format_value(sign * v), 'no_format': sign * v}
+                                                     for v in [values['direction'], values['4'],
+                                                               values['3'], values['2'],
+                                                               values['1'], values['0'], values['total']]],
+                    'trust': values['trust'],
+                    'unfoldable': True,
+                    'unfolded': 'partner_%s' % (values['partner_id'],) in options.get('unfolded_lines'),
+                    'partner_id': values['partner_id'],
                 }
+                lines.append(vals)
+                if 'partner_%s' % (values['partner_id'],) in options.get('unfolded_lines'):
+                    for line in amls[values['partner_id']]:
+                        aml = line['line']
+                        if aml.move_id.is_purchase_document():
+                            caret_type = 'account.invoice.in'
+                        elif aml.move_id.is_sale_document():
+                            caret_type = 'account.invoice.out'
+                        elif aml.payment_id:
+                            caret_type = 'account.payment'
+                        else:
+                            caret_type = 'account.move'
+
+                        line_date = aml.date_maturity or aml.date
+                        if not self._context.get('no_format'):
+                            line_date = format_date(self.env, line_date)
+                        vals = {
+                            'id': aml.id,
+                            'name': aml.move_id.name,
+                            'class': 'date',
+                            'caret_options': caret_type,
+                            'level': 4,
+                            'parent_id': 'partner_%s' % (values['partner_id'],),
+                            'columns': [{'name': v} for v in [format_date(self.env, aml.date_maturity or aml.date), aml.journal_id.code, aml.account_id.display_name, format_date(self.env, aml.expected_pay_date)]] +
+                                       [{'name': self.format_value(sign * v, blank_if_zero=True), 'no_format': sign * v} for v in [line['period'] == 6-i and line['amount'] or 0 for i in range(7)]],
+                            'action_context': {
+                                'default_type': aml.move_id.type,
+                                'default_journal_id': aml.move_id.journal_id.id,
+                            },
+                            'title_hover': self._format_aml_name(aml.name, aml.ref, aml.move_id.name),
+                        }
+                        lines.append(vals)
+            if total and not line_id:
+                total_line = {
+                    'id': 0,
+                    'name': _('Total'),
+                    'class': 'total',
+                    'level': 2,
+                    'columns': [{'name': ''}] * 4 + [{'name': self.format_value(sign * v), 'no_format': sign * v} for v in [total[6], total[4], total[3], total[2], total[1], total[0], total[5]]],
+                }
+                lines.append(total_line)
+            return lines
+        else:
+            return super(ReportAccountAgedPartner, self)._get_lines(options, line_id)
 
 
-    @api.model
-    def _get_column_details(self, options):
-        return [
-            self._header_column(),
-            self._field_column('report_date'),
-            self._field_column('journal_code', name="Journal"),
-            self._field_column('account_name', name="Account"),
-            self._field_column('expected_pay_date'),
-            self._field_column('period0', name=_("As of: %s") % format_date(self.env, options['date']['date_to'])),
-            self.with_context(intervalo=options.get('interval'))._field_column('period1', sortable=True),
-            self.with_context(intervalo=options.get('interval'))._field_column('period2', sortable=True),
-            self.with_context(intervalo=options.get('interval'))._field_column('period3', sortable=True),
-            self.with_context(intervalo=options.get('interval'))._field_column('period4', sortable=True),
-            self._field_column('period5', sortable=True),
-            self._custom_column(  # Avoid doing twice the sub-select in the view
-                name=_('Total'),
-                classes=['number'],
-                formatter=self.format_value,
-                getter=(lambda v: v['period0'] + v['period1'] + v['period2'] + v['period3'] + v['period4'] + v['period5']),
-                sortable=True,
-            ),
-        ]
+class ReportAgedPartnerBalance(models.AbstractModel):
+
+    _inherit = 'report.account.report_agedpartnerbalance'
+
+    def _get_partner_move_lines(self, account_type, date_from, target_move, period_length):
+        # This method can receive the context key 'include_nullified_amount' {Boolean}
+        # Do an invoice and a payment and unreconcile. The amount will be nullified
+        # By default, the partner wouldn't appear in this report.
+        # The context key allow it to appear
+        # In case of a period_length of 30 days as of 2019-02-08, we want the following periods:
+        # Name       Stop         Start
+        # 1 - 30   : 2019-02-07 - 2019-01-09
+        # 31 - 60  : 2019-01-08 - 2018-12-10
+        # 61 - 90  : 2018-12-09 - 2018-11-10
+        # 91 - 120 : 2018-11-09 - 2018-10-11
+        # +120     : 2018-10-10
+
+        ctx = self._context
+
+        if not ctx.get('interval_custom'):
+            return super(ReportAgedPartnerBalance, self)._get_partner_move_lines(account_type, date_from, target_move, period_length)
+        else:
+            date_from = fields.Date.from_string(date_from)
+            start = date_from            
+            name_interval_1 = str(self._context.get('interval')['1'][0]) +' - ' +str(self._context.get('interval')['1'][1])
+            name_interval_2 = str(self._context.get('interval')['2'][0]) +' - ' +str(self._context.get('interval')['2'][1])
+            name_interval_3 = str(self._context.get('interval')['3'][0]) +' - ' +str(self._context.get('interval')['3'][1])
+            name_interval_4 = str(self._context.get('interval')['4'][0]) +' - ' +str(self._context.get('interval')['4'][1])
+            name_interval_5 = ' +' +str(self._context.get('interval')['4'][1])
+
+            stop_interval_1 = (start - relativedelta(days=self._context.get('interval')['1'][0])).strftime('%Y-%m-%d')
+            start_interval_1 = (start - relativedelta(days=self._context.get('interval')['1'][1])).strftime('%Y-%m-%d')
+
+            stop_interval_2 = (start - relativedelta(days=self._context.get('interval')['2'][0])).strftime('%Y-%m-%d')
+            start_interval_2 = (start - relativedelta(days=self._context.get('interval')['2'][1])).strftime('%Y-%m-%d')
+
+            stop_interval_3 = (start - relativedelta(days=self._context.get('interval')['3'][0])).strftime('%Y-%m-%d')
+            start_interval_3 = (start - relativedelta(days=self._context.get('interval')['3'][1])).strftime('%Y-%m-%d')
 
 
+            stop_interval_4 = (start - relativedelta(days=self._context.get('interval')['4'][0])).strftime('%Y-%m-%d')
+            start_interval_4 = (start - relativedelta(days=self._context.get('interval')['4'][1])).strftime('%Y-%m-%d')
 
-    def _field_column(self, field_name, sortable=False, name=None):
-        """Build a column based on a field.
+            stop_interval_5 = (start - relativedelta(days=self._context.get('interval')['4'][1]+1)).strftime('%Y-%m-%d')
 
-        The type of the field determines how it is displayed.
-        The column's title is the name of the field.
-        :param field_name: The name of the fields.Field to use
-        :param sortable: Allow the user to sort data based on this column
-        :param name: Use a specific name for display.
-        """
-        classes = ['text-nowrap']
-        def getter(v): return v.get(field_name, '')
-        if self._fields[field_name].type in ['monetary', 'float']:
-            classes += ['number']
-            def formatter(v): return self.format_value(v)
-        elif self._fields[field_name].type in ['char']:
-            classes += ['text-center']
-            def formatter(v): return v
-        elif self._fields[field_name].type in ['date']:
-            classes += ['date']
-            def formatter(v): return format_date(self.env, v)
+            periods = {'4': {'name': name_interval_1, 'stop': stop_interval_1, 'start': start_interval_1}, 
+                '3': {'name': name_interval_2, 'stop': stop_interval_2, 'start': start_interval_2}, 
+                '2': {'name': name_interval_3, 'stop': stop_interval_3, 'start': start_interval_3}, 
+                '1': {'name': name_interval_4, 'stop': stop_interval_4, 'start': start_interval_4}, 
+                '0': {'name': name_interval_5, 'stop': stop_interval_5, 'start': False}}
 
-        interval = self._context.get('interval') or self._context.get('intervalo')
-        if interval:
-            if field_name == 'period1':
-                name = str(interval['1'][0]) + ' - ' + str(interval['1'][1])
-            if field_name == 'period2':
-                name = str(interval['2'][0]) + ' - ' + str(interval['2'][1])
-            if field_name == 'period3':
-                name = str(interval['3'][0]) + ' - ' + str(interval['3'][1])
-            if field_name == 'period4':
-                name = str(interval['4'][0]) + ' - ' + str(interval['4'][1])
-        return self._custom_column(name=name or self._fields[field_name].string,
-                                   getter=getter,
-                                   formatter=formatter,
-                                   classes=classes,
-                                   sortable=sortable)
+
+            res = []
+            total = []
+            partner_clause = ''
+            cr = self.env.cr
+            user_company = self.env.company
+            user_currency = user_company.currency_id
+            company_ids = self._context.get('company_ids') or [user_company.id]
+            move_state = ['draft', 'posted']
+            if target_move == 'posted':
+                move_state = ['posted']
+            arg_list = (tuple(move_state), tuple(account_type))
+            #build the reconciliation clause to see what partner needs to be printed
+            reconciliation_clause = '(l.reconciled IS FALSE)'
+            cr.execute('SELECT debit_move_id, credit_move_id FROM account_partial_reconcile where max_date > %s', (date_from,))
+            reconciled_after_date = []
+            for row in cr.fetchall():
+                reconciled_after_date += [row[0], row[1]]
+            if reconciled_after_date:
+                reconciliation_clause = '(l.reconciled IS FALSE OR l.id IN %s)'
+                arg_list += (tuple(reconciled_after_date),)
+            if ctx.get('partner_ids'):
+                partner_clause = 'AND (l.partner_id IN %s)'
+                arg_list += (tuple(ctx['partner_ids'].ids),)
+            if ctx.get('partner_categories'):
+                partner_clause += 'AND (l.partner_id IN %s)'
+                partner_ids = self.env['res.partner'].search([('category_id', 'in', ctx['partner_categories'].ids)]).ids
+                arg_list += (tuple(partner_ids or [0]),)
+            arg_list += (date_from, tuple(company_ids))
+
+            query = '''
+                SELECT DISTINCT l.partner_id, res_partner.name AS name, UPPER(res_partner.name) AS UPNAME, CASE WHEN prop.value_text IS NULL THEN 'normal' ELSE prop.value_text END AS trust
+                FROM account_move_line AS l
+                  LEFT JOIN res_partner ON l.partner_id = res_partner.id
+                  LEFT JOIN ir_property prop ON (prop.res_id = 'res.partner,'||res_partner.id AND prop.name='trust' AND prop.company_id=%s),
+                  account_account, account_move am
+                WHERE (l.account_id = account_account.id)
+                    AND (l.move_id = am.id)
+                    AND (am.state IN %s)
+                    AND (account_account.internal_type IN %s)
+                    AND ''' + reconciliation_clause + partner_clause + '''
+                    AND (l.date <= %s)
+                    AND l.company_id IN %s
+                ORDER BY UPPER(res_partner.name)'''
+            arg_list = (self.env.company.id,) + arg_list
+            cr.execute(query, arg_list)
+
+            partners = cr.dictfetchall()
+            # put a total of 0
+            for i in range(7):
+                total.append(0)
+
+            # Build a string like (1,2,3) for easy use in SQL query
+            partner_ids = [partner['partner_id'] for partner in partners if partner['partner_id']]
+            lines = dict((partner['partner_id'] or False, []) for partner in partners)
+            if not partner_ids:
+                return [], [], {}
+
+            # Use one query per period and store results in history (a list variable)
+            # Each history will contain: history[1] = {'<partner_id>': <partner_debit-credit>}
+            history = []
+            for i in range(5):
+                args_list = (tuple(move_state), tuple(account_type), tuple(partner_ids),)
+                dates_query = '(COALESCE(l.date_maturity,l.date)'
+
+                if periods[str(i)]['start'] and periods[str(i)]['stop']:
+                    dates_query += ' BETWEEN %s AND %s)'
+                    args_list += (periods[str(i)]['start'], periods[str(i)]['stop'])
+                elif periods[str(i)]['start']:
+                    dates_query += ' >= %s)'
+                    args_list += (periods[str(i)]['start'],)
+                else:
+                    dates_query += ' <= %s)'
+                    args_list += (periods[str(i)]['stop'],)
+                args_list += (date_from, tuple(company_ids))
+
+                query = '''SELECT l.id
+                        FROM account_move_line AS l, account_account, account_move am
+                        WHERE (l.account_id = account_account.id) AND (l.move_id = am.id)
+                            AND (am.state IN %s)
+                            AND (account_account.internal_type IN %s)
+                            AND ((l.partner_id IN %s) OR (l.partner_id IS NULL))
+                            AND ''' + dates_query + '''
+                        AND (l.date <= %s)
+                        AND l.company_id IN %s
+                        ORDER BY COALESCE(l.date_maturity, l.date)'''
+                cr.execute(query, args_list)
+                partners_amount = {}
+                aml_ids = cr.fetchall()
+                aml_ids = aml_ids and [x[0] for x in aml_ids] or []
+                for line in self.env['account.move.line'].browse(aml_ids).with_context(prefetch_fields=False):
+                    partner_id = line.partner_id.id or False
+                    if partner_id not in partners_amount:
+                        partners_amount[partner_id] = 0.0
+                    line_amount = line.company_id.currency_id._convert(line.balance, user_currency, user_company, date_from)
+                    if user_currency.is_zero(line_amount):
+                        continue
+                    for partial_line in line.matched_debit_ids:
+                        if partial_line.max_date <= date_from:
+                            line_amount += partial_line.company_id.currency_id._convert(partial_line.amount, user_currency, user_company, date_from)
+                    for partial_line in line.matched_credit_ids:
+                        if partial_line.max_date <= date_from:
+                            line_amount -= partial_line.company_id.currency_id._convert(partial_line.amount, user_currency, user_company, date_from)
+
+                    if not self.env.company.currency_id.is_zero(line_amount):
+                        partners_amount[partner_id] += line_amount
+                        lines.setdefault(partner_id, [])
+                        lines[partner_id].append({
+                            'line': line,
+                            'amount': line_amount,
+                            'period': i + 1,
+                            })
+                history.append(partners_amount)
+
+            # This dictionary will store the not due amount of all partners
+            undue_amounts = {}
+            query = '''SELECT l.id
+                    FROM account_move_line AS l, account_account, account_move am
+                    WHERE (l.account_id = account_account.id) AND (l.move_id = am.id)
+                        AND (am.state IN %s)
+                        AND (account_account.internal_type IN %s)
+                        AND (COALESCE(l.date_maturity,l.date) >= %s)\
+                        AND ((l.partner_id IN %s) OR (l.partner_id IS NULL))
+                    AND (l.date <= %s)
+                    AND l.company_id IN %s
+                    ORDER BY COALESCE(l.date_maturity, l.date)'''
+            cr.execute(query, (tuple(move_state), tuple(account_type), date_from, tuple(partner_ids), date_from, tuple(company_ids)))
+            aml_ids = cr.fetchall()
+            aml_ids = aml_ids and [x[0] for x in aml_ids] or []
+            for line in self.env['account.move.line'].browse(aml_ids):
+                partner_id = line.partner_id.id or False
+                if partner_id not in undue_amounts:
+                    undue_amounts[partner_id] = 0.0
+                line_amount = line.company_id.currency_id._convert(line.balance, user_currency, user_company, date_from)
+                if user_currency.is_zero(line_amount):
+                    continue
+                for partial_line in line.matched_debit_ids:
+                    if partial_line.max_date <= date_from:
+                        line_amount += partial_line.company_id.currency_id._convert(partial_line.amount, user_currency, user_company, date_from)
+                for partial_line in line.matched_credit_ids:
+                    if partial_line.max_date <= date_from:
+                        line_amount -= partial_line.company_id.currency_id._convert(partial_line.amount, user_currency, user_company, date_from)
+                if not self.env.company.currency_id.is_zero(line_amount):
+                    undue_amounts[partner_id] += line_amount
+                    lines.setdefault(partner_id, [])
+                    lines[partner_id].append({
+                        'line': line,
+                        'amount': line_amount,
+                        'period': 6,
+                    })
+
+            for partner in partners:
+                if partner['partner_id'] is None:
+                    partner['partner_id'] = False
+                at_least_one_amount = False
+                values = {}
+                undue_amt = 0.0
+                if partner['partner_id'] in undue_amounts:  # Making sure this partner actually was found by the query
+                    undue_amt = undue_amounts[partner['partner_id']]
+
+                total[6] = total[6] + undue_amt
+                values['direction'] = undue_amt
+                if not float_is_zero(values['direction'], precision_rounding=self.env.company.currency_id.rounding):
+                    at_least_one_amount = True
+
+                for i in range(5):
+                    during = False
+                    if partner['partner_id'] in history[i]:
+                        during = [history[i][partner['partner_id']]]
+                    # Adding counter
+                    total[(i)] = total[(i)] + (during and during[0] or 0)
+                    values[str(i)] = during and during[0] or 0.0
+                    if not float_is_zero(values[str(i)], precision_rounding=self.env.company.currency_id.rounding):
+                        at_least_one_amount = True
+                values['total'] = sum([values['direction']] + [values[str(i)] for i in range(5)])
+                # Add for total
+                total[(i + 1)] += values['total']
+                values['partner_id'] = partner['partner_id']
+                if partner['partner_id']:
+                    values['name'] = len(partner['name']) >= 45 and partner['name'][0:40] + '...' or partner['name']
+                    values['trust'] = partner['trust']
+                else:
+                    values['name'] = _('Unknown Partner')
+                    values['trust'] = False
+
+                if at_least_one_amount or (self._context.get('include_nullified_amount') and lines[partner['partner_id']]):
+                    res.append(values)
+            return res, total, lines
