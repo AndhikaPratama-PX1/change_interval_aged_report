@@ -51,7 +51,7 @@
         <field name="res_model">tmp.aged.report.wizard</field>
         <field name="view_mode">form</field>
         <field name="target">new</field>
-        <field name="context">{'default_name':'Receivable'}</field>
+        <field name="context">{'default_name':'Receivable','interval_custom':1}</field>
     </record>
 
     <record id="tmp_aged_payable_report_wizard_action" model="ir.actions.act_window">
@@ -60,7 +60,7 @@
         <field name="res_model">tmp.aged.report.wizard</field>
         <field name="view_mode">form</field>
         <field name="target">new</field>
-        <field name="context">{'default_name':'Payable'}</field>
+        <field name="context">{'default_name':'Payable','interval_custom':1}</field>
     </record>
 
 
