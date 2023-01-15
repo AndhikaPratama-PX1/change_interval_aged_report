@@ -16,7 +16,7 @@ class TmpAgedReportWizard(models.TransientModel):
 
 
     name = fields.Char("Name")
-    interval_1_1 = fields.Integer("Interval 1-1",required=1, default="1")
+    interval_1_1 = fields.Integer("Interval 1-1",required=1, default="0")
     interval_1_2 = fields.Integer("Interval 1-2",required=1, default="30")
     interval_2_1 = fields.Integer("Interval 2-1",required=1, default="31")
     interval_2_2 = fields.Integer("Interval 2-2",required=1, default="60")
@@ -43,7 +43,7 @@ class TmpAgedReportWizard(models.TransientModel):
         interval_4_1 = self.interval_4_1
         interval_4_2 = self.interval_4_2
 
-        if interval_1_1 <= 0 or interval_1_2 <= 0:
+        if interval_1_2 <= 0:
             raise ValidationError("Please input the correct interval value.\nThe interval value must be greater than 0")
         if interval_2_1 <= 0 or interval_2_2 <= 0:
             raise ValidationError("Please input the correct interval value.\nThe interval value must be greater than 0")
