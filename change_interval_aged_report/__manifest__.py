@@ -11,7 +11,7 @@
     'depends': ['account','account_reports'],
     'data': [ 
        'security/ir.model.access.csv',
-       'views/assets.xml',
+       # 'views/assets.xml',
        'wizard/tmp_aged_views.xml',
 
     ],   
@@ -20,6 +20,6 @@
     ],
 
     'maintainer': 'Apra IT Solutions',
-    'price': 30,
+    'price': 45,
     'currency': 'EUR',
 }

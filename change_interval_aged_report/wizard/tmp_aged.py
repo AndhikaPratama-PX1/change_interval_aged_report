@@ -64,9 +64,24 @@ class TmpAgedReportWizard(models.TransientModel):
                         3:[interval_3_1,interval_3_2],
                         4:[interval_4_1,interval_4_2],
                     }
-        return {
+        if self.name == 'Receivable':
+            report_id = self.env.ref('account_reports.aged_receivable_report').id
+            self.env.ref('account_reports.aged_receivable_report_period1').write({'name':str(interval_1_1)+'-'+str(interval_1_2)})
+            self.env.ref('account_reports.aged_receivable_report_period2').write({'name':str(interval_2_1)+'-'+str(interval_2_2)})
+            self.env.ref('account_reports.aged_receivable_report_period3').write({'name':str(interval_3_1)+'-'+str(interval_3_2)})
+            self.env.ref('account_reports.aged_receivable_report_period4').write({'name':str(interval_4_1)+'-'+str(interval_4_2)})
+        elif self.name == 'Payable':
+            report_id = self.env.ref('account_reports.aged_payable_report').id
+            self.env.ref('account_reports.aged_payable_report_period1').write({'name':str(interval_1_1)+'-'+str(interval_1_2)})
+            self.env.ref('account_reports.aged_payable_report_period2').write({'name':str(interval_2_1)+'-'+str(interval_2_2)})
+            self.env.ref('account_reports.aged_payable_report_period3').write({'name':str(interval_3_1)+'-'+str(interval_3_2)})
+            self.env.ref('account_reports.aged_payable_report_period4').write({'name':str(interval_4_1)+'-'+str(interval_4_2)})
+        res = {
             'name': name ,
             'type': 'ir.actions.client',
             'tag': 'account_report',
-            'context':{'model': model_report,'interval':interval}
+            'context':{'model': model_report,'interval':interval,'report_id':report_id },
+            'target': 'inline',
+            'params':{'options':{'report_id':report_id}}
         }
+        return res
