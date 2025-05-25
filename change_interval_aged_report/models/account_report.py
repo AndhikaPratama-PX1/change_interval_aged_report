@@ -6,6 +6,11 @@ from odoo import models, fields, _
 from dateutil.relativedelta import relativedelta
 from itertools import chain
 
+class AccountReportColumn(models.Model):
+    _inherit = "account.report.column"
+
+    interval1 = fields.Integer()
+    interval2 = fields.Integer()
 
 class AgedPartnerBalanceCustomHandler(models.AbstractModel):
     _inherit = 'account.aged.partner.balance.report.handler'
@@ -20,25 +25,32 @@ class AgedPartnerBalanceCustomHandler(models.AbstractModel):
 
         date_to = fields.Date.from_string(options['date']['date_to'])
 
+
+        if internal_type == 'asset_receivable':
+            interval_print = {
+                        '1':[self.env.ref('account_reports.aged_receivable_report_period1').interval1,self.env.ref('account_reports.aged_receivable_report_period1').interval2],
+                        '2':[self.env.ref('account_reports.aged_receivable_report_period2').interval1,self.env.ref('account_reports.aged_receivable_report_period2').interval2],
+                        '3':[self.env.ref('account_reports.aged_receivable_report_period3').interval1,self.env.ref('account_reports.aged_receivable_report_period3').interval2],
+                        '4':[self.env.ref('account_reports.aged_receivable_report_period4').interval1,self.env.ref('account_reports.aged_receivable_report_period4').interval2],
+                    }
+        elif internal_type == 'liability_payable':
+            interval_print = {
+                        '1':[self.env.ref('account_reports.aged_payable_report_period1').interval1,self.env.ref('account_reports.aged_payable_report_period1').interval2],
+                        '2':[self.env.ref('account_reports.aged_payable_report_period2').interval1,self.env.ref('account_reports.aged_payable_report_period2').interval2],
+                        '3':[self.env.ref('account_reports.aged_payable_report_period3').interval1,self.env.ref('account_reports.aged_payable_report_period3').interval2],
+                        '4':[self.env.ref('account_reports.aged_payable_report_period4').interval1,self.env.ref('account_reports.aged_payable_report_period4').interval2],
+                    }
+
+
+
         periods = [
             (False, fields.Date.to_string(date_to)),
-            (minus_days(date_to, 1), minus_days(date_to, 30)),
-            (minus_days(date_to, 31), minus_days(date_to, 60)),
-            (minus_days(date_to, 61), minus_days(date_to, 90)),
-            (minus_days(date_to, 91), minus_days(date_to, 120)),
-            (minus_days(date_to, 121), False),
+            (minus_days(date_to, interval_print['1'][0]), minus_days(date_to, interval_print['1'][1])),
+            (minus_days(date_to, interval_print['2'][0]), minus_days(date_to, interval_print['2'][1])),
+            (minus_days(date_to, interval_print['3'][0]), minus_days(date_to, interval_print['3'][1])),
+            (minus_days(date_to, interval_print['4'][0]), minus_days(date_to, interval_print['4'][1])),
+            (minus_days(date_to, interval_print['4'][1]+1), False),
         ]
-
-        if self._context.get('interval'):
-            interval_print = self._context['interval']
-            periods = [
-                (False, fields.Date.to_string(date_to)),
-                (minus_days(date_to, interval_print['1'][0]), minus_days(date_to, interval_print['1'][1])),
-                (minus_days(date_to, interval_print['2'][0]), minus_days(date_to, interval_print['2'][1])),
-                (minus_days(date_to, interval_print['3'][0]), minus_days(date_to, interval_print['3'][1])),
-                (minus_days(date_to, interval_print['4'][0]), minus_days(date_to, interval_print['4'][1])),
-                (minus_days(date_to, interval_print['4'][1]+1), False),
-            ]
 
         def build_result_dict(report, query_res_lines):
             rslt = {f'period{i}': 0 for i in range(len(periods))}

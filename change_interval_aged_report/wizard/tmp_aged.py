@@ -66,16 +66,16 @@ class TmpAgedReportWizard(models.TransientModel):
                     }
         if self.name == 'Receivable':
             report_id = self.env.ref('account_reports.aged_receivable_report').id
-            self.env.ref('account_reports.aged_receivable_report_period1').write({'name':str(interval_1_1)+'-'+str(interval_1_2)})
-            self.env.ref('account_reports.aged_receivable_report_period2').write({'name':str(interval_2_1)+'-'+str(interval_2_2)})
-            self.env.ref('account_reports.aged_receivable_report_period3').write({'name':str(interval_3_1)+'-'+str(interval_3_2)})
-            self.env.ref('account_reports.aged_receivable_report_period4').write({'name':str(interval_4_1)+'-'+str(interval_4_2)})
+            self.env.ref('account_reports.aged_receivable_report_period1').write({'interval1':interval_1_1,'interval2':interval_1_2,'name':str(interval_1_1)+'-'+str(interval_1_2)})
+            self.env.ref('account_reports.aged_receivable_report_period2').write({'interval1':interval_2_1,'interval2':interval_2_2,'name':str(interval_2_1)+'-'+str(interval_2_2)})
+            self.env.ref('account_reports.aged_receivable_report_period3').write({'interval1':interval_3_1,'interval2':interval_3_2,'name':str(interval_3_1)+'-'+str(interval_3_2)})
+            self.env.ref('account_reports.aged_receivable_report_period4').write({'interval1':interval_4_1,'interval2':interval_4_2,'name':str(interval_4_1)+'-'+str(interval_4_2)})
         elif self.name == 'Payable':
             report_id = self.env.ref('account_reports.aged_payable_report').id
-            self.env.ref('account_reports.aged_payable_report_period1').write({'name':str(interval_1_1)+'-'+str(interval_1_2)})
-            self.env.ref('account_reports.aged_payable_report_period2').write({'name':str(interval_2_1)+'-'+str(interval_2_2)})
-            self.env.ref('account_reports.aged_payable_report_period3').write({'name':str(interval_3_1)+'-'+str(interval_3_2)})
-            self.env.ref('account_reports.aged_payable_report_period4').write({'name':str(interval_4_1)+'-'+str(interval_4_2)})
+            self.env.ref('account_reports.aged_payable_report_period1').write({'interval1':interval_1_1,'interval2':interval_1_2,'name':str(interval_1_1)+'-'+str(interval_1_2)})
+            self.env.ref('account_reports.aged_payable_report_period2').write({'interval1':interval_2_1,'interval2':interval_2_2,'name':str(interval_2_1)+'-'+str(interval_2_2)})
+            self.env.ref('account_reports.aged_payable_report_period3').write({'interval1':interval_3_1,'interval2':interval_3_2,'name':str(interval_3_1)+'-'+str(interval_3_2)})
+            self.env.ref('account_reports.aged_payable_report_period4').write({'interval1':interval_4_1,'interval2':interval_4_2,'name':str(interval_4_1)+'-'+str(interval_4_2)})
         res = {
             'name': name ,
             'type': 'ir.actions.client',
